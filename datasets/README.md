@@ -1,4 +1,4 @@
-# How to download
+# Download
 download from [hugging face](https://huggingface.co/datasets/Bowen999/lipids_ms2)   
 
 or use Python to use it directly
@@ -20,29 +20,29 @@ gnps_df = gnps_mb_mona['train'].to_pandas()
 
 
 # Data source
-## MS DIAL (only lipidome atlas) 
+#### MS DIAL (only lipidome atlas) 
 * Source: [Supplementary information](https://www.nature.com/articles/s41587-020-0531-2#Sec17) of Tsugawa, H., Ikeda, K., Takahashi, M. et al. A lipidome atlas in MS-DIAL 4. Nat Biotechnol 38, 1159–1163 (2020). https://doi.org/10.1038/s41587-020-0531-2
 * Intruments: TOF
 * Complete MS DIAL DB (not only lipids): https://zenodo.org/records/10953284
 
 
-## MassSpecGym:
+#### MassSpecGym:
 * Source: https://huggingface.co/datasets/roman-bushuiev/MassSpecGym
 * Instruments: TOF, Orbitrap
 
-## GNPS
+#### GNPS
 * Source: https://external.gnps2.org/gnpslibrary
 
-## MassBank
+#### MassBank
 * Source: https://external.gnps2.org/gnpslibrary
 
-## PNNL-LIPIDS
+#### PNNL-LIPIDS
 * Source: https://external.gnps2.org/gnpslibrary
 
-## MONA
+#### MONA
 * Source: https://external.gnps2.org/gnpslibrary
 
-## Li Lab Lipid Standrad (not open)
+#### Li Lab Lipid Standrad (not open)
 Source: Li Lab
 
 
