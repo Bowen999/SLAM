@@ -10,7 +10,7 @@ training_set, test_set, test_set2, can be downloaded from: https://huggingface.c
   The test set is sourced from **MassSpecGym**, containing 4,631 MS/MS spectra.  
   Among them, 1,372 spectra are **novel** (not present in the training set).
 
-- **Test Set2**
+- **Test Set2**:  
 MS2 data of standards from Li Lab and Nova Medical Testing (non-public data)"
 
 *Preprocessing for **comprehensive MS2 databases** (like MassSpecGym) involved retaining only lipids by filtering the **InChI Key main block** using references from the MS DIAL Lipidome Atlas and Swiss Lipids*.
