@@ -2,6 +2,7 @@
 training_set, test_set, test_set2, can be downloaded from: https://huggingface.co/datasets/Bowen999/lipids_ms2/tree/main
 
 ## Data Source
+
 - **Training Set**(train_set_no_sn.csv):  
   The training set contains 959,031 entries of lipid MS/MS spectra and corresponding structural information.  
   It is constructed by integrating data from multiple sources, including **MS DIAL Lipidome Atlas**, **GNPS**, **MassBank**, **MoNA**, **PNNL-Lipids**, **HCE**, and **IOBA_NHC**.
@@ -10,6 +11,8 @@ training_set, test_set, test_set2, can be downloaded from: https://huggingface.c
   The test set is sourced from **MassSpecGym**, containing 4,631 MS/MS spectra.  
   Among them, 1,372 spectra are **novel** (not present in the training set).
 
+- **Test Set2**:  
+MS2 data of standards from Li Lab and Nova Medical Testing (non-public data)"
 *Preprocessing for **comprehensive MS2 databases** (like MassSpecGym) involved retaining only lipids by filtering the **InChI Key main block** using references from the MS DIAL Lipidome Atlas and Swiss Lipids*.
 
 
@@ -55,3 +58,4 @@ training_set, test_set, test_set2, can be downloaded from: https://huggingface.c
 | 37 | **MS2_norm** | Normalized MS2 intensities, scaled from 0–100. If more than 100 peaks, only the 100 highest-intensity peaks are retained. |
 | 38 | **MS2_frag_formula** | The chemical formula for each fragment in the MS2 spectrum, corresponding to the peaks in `MS2_norm`. |
 | 39 | **ref** | Chain information ignoring Sn position. Format: `[total_carbons, total_double_bonds, c_chain1, db_chain1, c_chain2, db_chain2, ...]`. Example: `[38, 1, 18, 1, 20, 0]` |
+=======
