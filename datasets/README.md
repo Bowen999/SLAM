@@ -58,4 +58,3 @@ MS2 data of standards from Li Lab and Nova Medical Testing (non-public data)"
 | 37 | **MS2_norm** | Normalized MS2 intensities, scaled from 0–100. If more than 100 peaks, only the 100 highest-intensity peaks are retained. |
 | 38 | **MS2_frag_formula** | The chemical formula for each fragment in the MS2 spectrum, corresponding to the peaks in `MS2_norm`. |
 | 39 | **ref** | Chain information ignoring Sn position. Format: `[total_carbons, total_double_bonds, c_chain1, db_chain1, c_chain2, db_chain2, ...]`. Example: `[38, 1, 18, 1, 20, 0]` |
-=======
