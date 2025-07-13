@@ -1,12 +1,11 @@
 # '''
-# Version 5.8 (Deeper Models & Enhanced Output)
-# - Model architectures for LSTM, MLP, and CNN have been made deeper and more
-#   complex by stacking layers and increasing units/filters.
-# - Dropout and BatchNormalization layers have been added to prevent overfitting.
-# - The final output CSV now includes the original input features and true target
-#   values alongside the predictions for a more comprehensive analysis.
-# - Predicted chain values are now saved in separate columns (pred_num_c_1, etc.)
-#   for easier comparison.
+# Version 5.9 (Focused LSTM & Enhanced Results Table)
+# - The pipeline is now focused exclusively on the LSTM model, removing the
+#   MLP, CNN, and best-model selection logic for simplification.
+# - The final results table has been significantly enhanced to include new columns
+#   for easier analysis: 'name', 'ref' (true values list), 'pred_num_c',
+#   'pred_num_db', 'pred_value' (predicted values list), and 'match' (a
+#   boolean for prediction correctness).
 # '''
 
 import pandas as pd
@@ -58,7 +57,7 @@ except Exception as e:
 MS2_FEATURE_DIM = 500
 MS2_MZ_MIN = 10
 MS2_MZ_MAX = 2000
-MS2_MZ_STEP = 0.1
+MS2_MZ_STEP = 0.2
 MS2_INTENSITY_THRESHOLD = 5.0
 
 # Target variable definitions
@@ -73,14 +72,14 @@ RANDOM_STATE = 42
 N_ESTIMATORS = 100
 DL_EPOCHS = 1
 DL_BATCH_SIZE = 8
-NOISE_LEVEL = 0.1
+NOISE_LEVEL = 0.2
 MAX_REPREDICTION_TRIES = 5
-MODEL_TYPES_TO_TEST = ['LSTM', 'MLP', 'CNN'] # Models to test
+MODEL_TYPE = 'LSTM' # Focused on LSTM
 
 
 # Output folder setup
 current_time_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-OUTPUT_FOLDER = f"results_{current_time_str}_v5.8_DeeperModels"
+OUTPUT_FOLDER = f"results_{current_time_str}_v5.9_LSTM_Focused"
 if not os.path.exists(OUTPUT_FOLDER):
     os.makedirs(OUTPUT_FOLDER)
 
@@ -228,7 +227,7 @@ def find_lipid_composition(formula: str, lipid_class: str, tolerance_ppm: float 
     return possible_matches
 
 def process_single_chain_lipids(df_single_chain):
-    """Calculates predictions for single-chain lipids using the formula-based method."""
+    """Calculates predictions for single-chain lipids and formats the output."""
     predictions = []
     for _, row in df_single_chain.iterrows():
         formula = row.get('formula', '')
@@ -246,9 +245,10 @@ def process_single_chain_lipids(df_single_chain):
         predictions.append(pred_s2_array)
 
     results_df = df_single_chain.copy()
-    pred_cols = [f'pred_{t}' for t in STAGE_2_TARGETS]
-    pred_df = pd.DataFrame(predictions, columns=pred_cols, index=results_df.index)
-    results_df = pd.concat([results_df, pred_df], axis=1)
+    # For single chain, the stage 1 prediction is the same as the ground truth
+    results_df['pred_num_c'] = results_df['num_c']
+    results_df['pred_num_db'] = results_df['num_db']
+    results_df['pred_value'] = [p.tolist() for p in predictions]
     results_df['is_valid_prediction'] = True
     return results_df
 
@@ -280,59 +280,7 @@ def build_stage2_lstm_model(num_base_s1_features, num_ms2_features):
     model.compile(optimizer='adam', loss='mean_squared_error')
     return model
 
-def build_stage2_mlp_model(num_base_s1_features, num_ms2_features):
-    """Builds a deeper MLP-style model with multiple dense layers."""
-    input_base_s1 = Input(shape=(num_base_s1_features,), name='input_base_s1')
-    input_ms2 = Input(shape=(num_ms2_features,), name='input_ms2')
-
-    noisy_ms2 = GaussianNoise(NOISE_LEVEL, name='gaussian_noise')(input_ms2)
-    concatenated_features = Concatenate(name='concatenate_features')([input_base_s1, noisy_ms2])
-
-    # Deeper MLP structure
-    dense_1 = Dense(256, activation='relu', name='dense_1')(concatenated_features)
-    bn_1 = BatchNormalization(name='bn_1')(dense_1)
-    dropout_1 = Dropout(0.4, name='dropout_1')(bn_1)
-    
-    dense_2 = Dense(128, activation='relu', name='dense_2')(dropout_1)
-    bn_2 = BatchNormalization(name='bn_2')(dense_2)
-    dropout_2 = Dropout(0.4, name='dropout_2')(bn_2)
-
-    repeated_features = RepeatVector(NUM_SEQ_OUTPUTS, name='repeat_vector')(dropout_2)
-    attention_out = Attention(name='attention_layer')([repeated_features, repeated_features])
-    
-    output = TimeDistributed(Dense(1, activation='relu'), name='output_layer')(attention_out)
-    
-    model = Model(inputs=[input_base_s1, input_ms2], outputs=output)
-    model.compile(optimizer='adam', loss='mean_squared_error')
-    return model
-
-def build_stage2_cnn_model(num_base_s1_features, num_ms2_features):
-    """Builds a deeper CNN model with stacked convolutional layers."""
-    input_base_s1 = Input(shape=(num_base_s1_features,), name='input_base_s1')
-    input_ms2 = Input(shape=(num_ms2_features,), name='input_ms2')
-
-    noisy_ms2 = GaussianNoise(NOISE_LEVEL, name='gaussian_noise')(input_ms2)
-    concatenated_features = Concatenate(name='concatenate_features')([input_base_s1, noisy_ms2])
-    
-    repeated_features = RepeatVector(NUM_SEQ_OUTPUTS, name='repeat_vector')(concatenated_features)
-    
-    # Deeper CNN structure
-    conv1 = Conv1D(filters=64, kernel_size=3, activation='relu', padding='same', name='conv1d_1')(repeated_features)
-    bn_1 = BatchNormalization(name='bn_1')(conv1)
-    dropout_1 = Dropout(0.3, name='dropout_1')(bn_1)
-
-    conv2 = Conv1D(filters=128, kernel_size=3, activation='relu', padding='same', name='conv1d_2')(dropout_1)
-    bn_2 = BatchNormalization(name='bn_2')(conv2)
-    dropout_2 = Dropout(0.3, name='dropout_2')(bn_2)
-
-    attention_out = Attention(name='attention_layer')([dropout_2, dropout_2])
-    output = TimeDistributed(Dense(1, activation='relu'), name='output_layer')(attention_out)
-    
-    model = Model(inputs=[input_base_s1, input_ms2], outputs=output)
-    model.compile(optimizer='adam', loss='mean_squared_error')
-    return model
-
-def train_pipeline(X_train_base, Y_train, df_train_full, model_type='LSTM'):
+def train_pipeline(X_train_base, Y_train, df_train_full):
     global scalers
     print("  1. Training Stage 1 model (num_c, num_db)...")
     X_train_s1 = X_train_base.copy()
@@ -359,17 +307,8 @@ def train_pipeline(X_train_base, Y_train, df_train_full, model_type='LSTM'):
 
     Y_train_s2_reshaped = Y_train[STAGE_2_TARGETS].values.reshape(-1, NUM_SEQ_OUTPUTS, 1)
 
-    print(f"  4. Building and Training Stage 2 {model_type} model...")
-    if model_type == 'LSTM':
-        model_builder = build_stage2_lstm_model
-    elif model_type == 'MLP':
-        model_builder = build_stage2_mlp_model
-    elif model_type == 'CNN':
-        model_builder = build_stage2_cnn_model
-    else:
-        raise ValueError(f"Unknown model_type: {model_type}")
-
-    model_s2 = model_builder(
+    print(f"  4. Building and Training Stage 2 {MODEL_TYPE} model...")
+    model_s2 = build_stage2_lstm_model(
         num_base_s1_features=X_train_s2_base_s1_scaled.shape[1],
         num_ms2_features=X_train_s2_ms2_scaled.shape[1]
     )
@@ -410,6 +349,7 @@ def evaluate_pipeline(df_test_orig, models, reducer, feature_columns, current_sc
         X_test_base = preprocess_base_features(df_multi_chain, is_train_phase=False)
         X_test_base = X_test_base.reindex(columns=feature_columns['s1'], fill_value=0)
         pred_test_s1 = np.round(models['s1'].predict(X_test_base)).astype(int)
+        pred_test_s1_df = pd.DataFrame(pred_test_s1, columns=['pred_num_c', 'pred_num_db'], index=df_multi_chain.index)
 
         X_test_ms2_raw = process_ms2_spectra(df_multi_chain)
         X_test_ms2_reduced_np = reducer.transform(X_test_ms2_raw)
@@ -481,21 +421,20 @@ def evaluate_pipeline(df_test_orig, models, reducer, feature_columns, current_sc
             validity_checks.append(is_valid_for_sample)
 
         multi_chain_results_df = df_multi_chain.copy()
-        pred_cols = [f'pred_{t}' for t in STAGE_2_TARGETS]
-        pred_df = pd.DataFrame(predictions_final, columns=pred_cols, index=multi_chain_results_df.index)
-        multi_chain_results_df = pd.concat([multi_chain_results_df, pred_df], axis=1)
+        multi_chain_results_df = pd.concat([multi_chain_results_df, pred_test_s1_df], axis=1)
+        multi_chain_results_df['pred_value'] = [p.tolist() for p in predictions_final]
         multi_chain_results_df['is_valid_prediction'] = validity_checks
 
-    # Combine results and calculate metrics
+    # Combine results and add final columns
     df_pred_out = pd.concat([single_chain_results_df, multi_chain_results_df]).sort_index()
     
-    # Calculate accuracy based on canonical representation
-    Y_test_s2 = df_test_orig.loc[df_pred_out.index][STAGE_2_TARGETS]
-    true_canonical = [canonicalize_chains(row).tobytes() for _, row in Y_test_s2.iterrows()]
-    
-    pred_cols = [f'pred_{t}' for t in STAGE_2_TARGETS]
-    pred_canonical = [canonicalize_chains(row.values).tobytes() for _, row in df_pred_out[pred_cols].iterrows()]
-    
+    # Add 'ref' and 'match' columns
+    df_pred_out['ref'] = df_test_orig.loc[df_pred_out.index][STAGE_2_TARGETS].values.tolist()
+    df_pred_out['match'] = df_pred_out.apply(lambda row: row['pred_value'] == row['ref'], axis=1)
+
+    # Calculate overall accuracy based on canonical representation
+    true_canonical = [canonicalize_chains(np.array(row)).tobytes() for row in df_pred_out['ref']]
+    pred_canonical = [canonicalize_chains(np.array(row)).tobytes() for row in df_pred_out['pred_value']]
     accuracy = accuracy_score(true_canonical, pred_canonical)
     validation_rate = df_pred_out['is_valid_prediction'].mean()
 
@@ -515,98 +454,68 @@ except FileNotFoundError as e:
 df_train, df_eval = train_test_split(df_train_orig, test_size=TEST_SPLIT_SIZE, random_state=RANDOM_STATE)
 all_test_dfs["Evaluation_Set"] = df_eval
 
+# Ensure required columns exist, adding them if necessary
 for name, df in all_test_dfs.items():
-    for col in ['num_chain'] + ALL_TARGETS:
-        if col not in df.columns: df[col] = 0
+    for col in ['name', 'ref', 'num_chain'] + ALL_TARGETS:
+        if col not in df.columns:
+            df[col] = 0 if col not in ['name', 'ref'] else ''
 
-# --- 4. Run Pipeline for All Model Types ---
-all_artifacts = {}
 
-for model_type in MODEL_TYPES_TO_TEST:
-    print(f"\n\n{'='*25} TESTING MODEL TYPE: {model_type.upper()} {'='*25}")
+# --- 4. Run Pipeline ---
+print(f"\n\n{'='*25} RUNNING PIPELINE FOR: {MODEL_TYPE.upper()} {'='*25}")
+
+# Exclude single-chain lipids from training
+df_train_current = df_train[df_train['num_chain'] != 1].copy().reset_index(drop=True)
+print(f"Training on {len(df_train_current)} multi-chain lipids.")
+
+X_train_base = preprocess_base_features(df_train_current, is_train_phase=True)
+Y_train = df_train_current[ALL_TARGETS]
+
+print(f"\n--- Running Training Pipeline ---")
+models, reducer, feature_cols, scalers = train_pipeline(X_train_base, Y_train, df_train_current)
+
+print(f"\n--- Evaluating {MODEL_TYPE} Model ---")
+model_results = {}
+model_predictions = {}
+for dataset_name, df_test in all_test_dfs.items():
+    print(f"  on: {dataset_name} (Size: {len(df_test)})")
+    accuracy, validation_rate, df_predictions = evaluate_pipeline(df_test, models, reducer, feature_cols, scalers)
     
-    # Exclude single-chain lipids from training
-    df_train_current = df_train[df_train['num_chain'] != 1].copy().reset_index(drop=True)
-    print(f"Training on {len(df_train_current)} multi-chain lipids.")
-    
-    X_train_base = preprocess_base_features(df_train_current, is_train_phase=True)
-    Y_train = df_train_current[ALL_TARGETS]
+    model_results[dataset_name] = {'Accuracy': accuracy, 'Validation_Rate': validation_rate}
+    model_predictions[dataset_name] = df_predictions
+    print(f"    Accuracy: {accuracy:.4f}, Validation Rate: {validation_rate:.4f}")
 
-    print(f"\n--- Running Training Pipeline for {model_type} ---")
-    models, reducer, feature_cols, current_scalers = train_pipeline(X_train_base, Y_train, df_train_current, model_type=model_type)
-
-    print(f"\n--- Evaluating {model_type} Model ---")
-    model_results = {}
-    model_predictions = {}
-    for dataset_name, df_test in all_test_dfs.items():
-        print(f"  on: {dataset_name} (Size: {len(df_test)})")
-        accuracy, validation_rate, df_predictions = evaluate_pipeline(df_test, models, reducer, feature_cols, current_scalers)
-        
-        model_results[dataset_name] = {'Accuracy': accuracy, 'Validation_Rate': validation_rate}
-        model_predictions[dataset_name] = df_predictions
-        print(f"    Accuracy: {accuracy:.4f}, Validation Rate: {validation_rate:.4f}")
-    
-    all_artifacts[model_type] = {
-        'models': models,
-        'reducer': reducer,
-        'scalers': current_scalers,
-        'results': pd.DataFrame(model_results).T,
-        'predictions': model_predictions
-    }
-
-# --- 5. Best Model Selection & Saving ---
-print("\n\n--- Best Model Selection ---")
-best_model_type = None
-best_score = -1
-
-for model_type, artifacts in all_artifacts.items():
-    eval_results = artifacts['results'].loc['Evaluation_Set']
-    score = eval_results['Accuracy'] * eval_results['Validation_Rate']
-    print(f"Model: {model_type}, Score (Acc * Val): {score:.4f}")
-    if score > best_score:
-        best_score = score
-        best_model_type = model_type
-
-print(f"\nBest performing model is: {best_model_type} with a score of {best_score:.4f}")
-
-# --- 6. Save Artifacts for the Best Model ---
-print(f"\n--- Saving Artifacts for Best Model ({best_model_type}) ---")
-best_artifacts = all_artifacts[best_model_type]
-best_models = best_artifacts['models']
-best_reducer = best_artifacts['reducer']
-best_scalers = best_artifacts['scalers']
-best_predictions = best_artifacts['predictions']
-best_results_df = best_artifacts['results']
-
-joblib.dump(best_models['s1'], os.path.join(OUTPUT_FOLDER, 'model_s1.joblib'))
-best_models['s2'].save(os.path.join(OUTPUT_FOLDER, 'model_s2.keras'))
-joblib.dump(best_reducer, os.path.join(OUTPUT_FOLDER, 'f_regression_reducer.joblib'))
-joblib.dump(best_scalers, os.path.join(OUTPUT_FOLDER, 'scalers.joblib'))
-print("Best model, reducer, and scalers saved.")
+# --- 5. Save Artifacts ---
+print(f"\n--- Saving Artifacts for {MODEL_TYPE} Model ---")
+joblib.dump(models['s1'], os.path.join(OUTPUT_FOLDER, 'model_s1.joblib'))
+models['s2'].save(os.path.join(OUTPUT_FOLDER, 'model_s2.keras'))
+joblib.dump(reducer, os.path.join(OUTPUT_FOLDER, 'f_regression_reducer.joblib'))
+joblib.dump(scalers, os.path.join(OUTPUT_FOLDER, 'scalers.joblib'))
+print("Model, reducer, and scalers saved.")
 
 # Define columns for the comprehensive output file
-base_info_cols = ['precursor_mz', 'formula', 'class', 'adduct', 'num_chain']
-true_target_cols = ALL_TARGETS
-pred_target_cols = [f'pred_{t}' for t in STAGE_2_TARGETS]
-validation_col = ['is_valid_prediction']
+output_cols = [
+    'name', 'precursor_mz', 'formula', 'class', 'adduct', 'num_chain',
+    'ref', 'pred_num_c', 'pred_num_db', 'pred_value', 'match', 'is_valid_prediction'
+]
 
-for dataset_name, df_pred in best_predictions.items():
+for dataset_name, df_pred in model_predictions.items():
     if not df_pred.empty:
         # Ensure all columns exist in the dataframe before selecting
-        cols_to_save = [col for col in base_info_cols + true_target_cols + pred_target_cols + validation_col if col in df_pred.columns]
+        cols_to_save = [col for col in output_cols if col in df_pred.columns]
         df_to_save = df_pred[cols_to_save]
         
         pred_filename = os.path.join(OUTPUT_FOLDER, f"predictions_{dataset_name}.csv")
         df_to_save.to_csv(pred_filename, index=False)
         print(f"Comprehensive predictions for {dataset_name} saved.")
 
-# --- 7. Final Output ---
-print("\n\n--- Final Results for Best Model ---")
-print(f"\n--- Summary for {best_model_type} ---")
-print(best_results_df.to_string(float_format="%.4f"))
-results_filename = os.path.join(OUTPUT_FOLDER, "accuracy_summary_best_model.csv")
-best_results_df.to_csv(results_filename)
-print(f"\nAccuracy summary for the best model saved to: {results_filename}")
-
+# --- 6. Final Output ---
+print("\n\n--- Final Results ---")
+results_df = pd.DataFrame(model_results).T
+print(f"\n--- Summary for {MODEL_TYPE} ---")
+print(results_df.to_string(float_format="%.4f"))
+results_filename = os.path.join(OUTPUT_FOLDER, "accuracy_summary.csv")
+results_df.to_csv(results_filename)
+print(f"\nAccuracy summary saved to: {results_filename}")
 
 print("\n--- Script Finished ---")
