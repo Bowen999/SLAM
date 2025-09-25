@@ -5,7 +5,7 @@ training_set, test_set, test_set2, can be downloaded from: https://huggingface.c
 
 - **Training Set**(train_set_no_sn.csv):  
   The training set contains 959,031 entries of lipid MS/MS spectra and corresponding structural information.  
-  It is constructed by integrating data from multiple sources, including **MS DIAL Lipidome Atlas**, **GNPS**, **MassBank**, **MoNA**, **PNNL-Lipids**, **HCE**, and **IOBA_NHC**.
+  It is constructed by integrating data from multiple sources, including **[MS DIAL Lipidome Atlas]()**, **[GNPS](https://external.gnps2.org/gnpslibrary)**, **MassBank**, **[MoNA](https://mona.fiehnlab.ucdavis.edu/downloads)**, **PNNL-Lipids**, **HCE**, and **IOBA_NHC**., **[PRIME](https://prime.psc.riken.jp)**
 
 - **Test Set**(test_set_no_sn.csv):  
   The test set is sourced from **MassSpecGym**, containing 4,631 MS/MS spectra.  
